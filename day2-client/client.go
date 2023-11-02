@@ -179,3 +179,46 @@ func Dial(network, address string, opts ...*Option) (client *Client, err error) 
 	}()
 	return NewClient(conn, opt)
 }
+
+func (client *Client) send(call *Call) {
+	client.sending.Lock()
+	defer client.sending.Unlock()
+	seq, err := client.registerCall(call)
+	if err != nil {
+		call.Error = err
+		call.done()
+		return
+	}
+	client.header.Seq = seq
+	client.header.ServiceMethod = call.ServiceMethod
+	client.header.Error = ""
+
+	if err := client.cc.Write(&client.header, call.Args); err != nil {
+		call := client.removeCall(seq)
+		if call != nil {
+			call.Error = err
+			call.done()
+		}
+	}
+}
+
+func (client *Client) Go(serviceMethod string, args, reply interface{}, done chan *Call) *Call {
+	if done == nil {
+		done = make(chan *Call, 10)
+	} else if cap(done) == 0 {
+		log.Panic("rpc client: done channel is unbuffered")
+	}
+	call := &Call{
+		ServiceMethod: serviceMethod,
+		Args:          args,
+		Reply:         reply,
+		Done:          done,
+	}
+	client.send(call)
+	return call
+}
+
+func (client *Client) Call(serviceMethod string, args, reply interface{}) error {
+	call := <-client.Go(serviceMethod, args, reply, make(chan *Call, 1)).Done
+	return call.Error
+}
