@@ -2,6 +2,7 @@ package gorpc
 
 import (
 	"errors"
+	"fmt"
 	"gorpc/codec"
 	"io"
 	"sync"
@@ -86,4 +87,34 @@ func (client *Client) terminateCalls(err error) {
 		call.Error = err
 		call.done()
 	}
+}
+
+// 接受消息
+func (client *Client) receive() {
+	var err error
+	for err == nil {
+		var h codec.Header
+		if err := client.cc.ReadHeader(&h); err != nil {
+			break
+		}
+		call := client.removeCall(h.Seq)
+		switch {
+		// call不存在,
+		case call == nil:
+			err = client.cc.ReadBody(nil)
+		// call不为空, 但是服务端出错
+		case h.Error != "":
+			call.Error = fmt.Errorf(h.Error)
+			err = client.cc.ReadBody(nil)
+			call.done()
+		// 服务器处理正常, 需要从body中读取Reply的值
+		default:
+			err = client.cc.ReadBody(call.Reply)
+			if err != nil {
+				call.Error = errors.New("reading body " + err.Error())
+			}
+			call.done()
+		}
+	}
+	client.terminateCalls(err)
 }
