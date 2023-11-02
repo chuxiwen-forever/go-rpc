@@ -52,3 +52,38 @@ func (client *Client) IsAvailable() bool {
 	defer client.mu.Unlock()
 	return !client.shutdown && !client.closing
 }
+
+// 将参数call添加到client.pending, 更新client.seq
+func (client *Client) registerCall(call *Call) (uint64, error) {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	if client.closing || client.shutdown {
+		return 0, ErrShutDown
+	}
+	call.Seq = client.seq
+	client.pending[call.Seq] = call
+	client.seq++
+	return call.Seq, nil
+}
+
+// 根据seq, 从client.pending中移除对应到call
+func (client *Client) removeCall(seq uint64) *Call {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	call := client.pending[seq]
+	delete(client.pending, seq)
+	return call
+}
+
+// 服务端和客户端出现错误时, 将shutdown设为true, 将错误信息通知给状态为pending的call
+func (client *Client) terminateCalls(err error) {
+	client.sending.Lock()
+	defer client.sending.Unlock()
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	client.shutdown = true
+	for _, call := range client.pending {
+		call.Error = err
+		call.done()
+	}
+}
