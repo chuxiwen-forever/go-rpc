@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"reflect"
+	"strings"
 	"sync"
 )
 
@@ -24,7 +25,41 @@ var DefaultOption = &Option{
 	CodecType:   codec.GobType,
 }
 
-type Server struct{}
+type Server struct {
+	serviceMap sync.Map
+}
+
+func (server *Server) Register(rcvr interface{}) error {
+	s := newService(rcvr)
+	if _, dup := server.serviceMap.LoadOrStore(s.name, s); dup {
+		return errors.New("rpc: service already defined: " + s.name)
+	}
+	return nil
+}
+
+func Register(rcvr interface{}) error {
+	return DefaultServer.Register(rcvr)
+}
+
+func (server *Server) findService(serviceMethod string) (svc *service, mtype *methodType, err error) {
+	dot := strings.LastIndex(serviceMethod, ".")
+	if dot < 0 {
+		err = errors.New("rpc server: service/method request ill-formed: " + serviceMethod)
+		return
+	}
+	serviceName, methodName := serviceMethod[:dot], serviceMethod[dot+1:]
+	svci, ok := server.serviceMap.Load(serviceName)
+	if !ok {
+		err = errors.New("rpc server: can't find service " + serviceName)
+		return
+	}
+	svc = svci.(*service)
+	mtype = svc.method[methodName]
+	if mtype == nil {
+		err = errors.New("rpc server: can't find method " + methodName)
+	}
+	return
+}
 
 func NewServer() *Server {
 	return &Server{}
@@ -64,7 +99,7 @@ func (server *Server) ServeConn(conn io.ReadWriteCloser) {
 
 	f := codec.NewCodecFuncMap[opt.CodecType]
 	if f == nil {
-		log.Printf("rpc server: invalid codec type %s", opt.CodecType)
+		log.Printf("rpc server: invalid codec type %server", opt.CodecType)
 		return
 	}
 	server.ServeCodec(f(conn))
