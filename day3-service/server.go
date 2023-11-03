@@ -3,7 +3,6 @@ package gorpc
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"gorpc/codec"
 	"io"
 	"log"
@@ -130,6 +129,8 @@ func (server *Server) ServeCodec(cc codec.Codec) {
 type request struct {
 	h            *codec.Header
 	argv, replyv reflect.Value
+	mtype        *methodType
+	svc          *service
 }
 
 func (server *Server) readRequestHeader(cc codec.Codec) (*codec.Header, error) {
@@ -149,9 +150,21 @@ func (server *Server) readRequest(cc codec.Codec) (*request, error) {
 		return nil, err
 	}
 	req := &request{h: h}
-	req.argv = reflect.New(reflect.TypeOf(""))
-	if err = cc.ReadBody(req.argv.Interface()); err != nil {
-		log.Println("rpc server: read argv err:", err)
+	req.svc, req.mtype, err = server.findService(h.ServiceMethod)
+	if err != nil {
+		return req, err
+	}
+	req.argv = req.mtype.newArgv()
+	req.replyv = req.mtype.newReplyv()
+
+	argvi := req.argv.Interface()
+	if req.argv.Type().Kind() != reflect.Ptr {
+		argvi = req.argv.Addr().Interface()
+	}
+
+	if err = cc.ReadBody(argvi); err != nil {
+		log.Println("rpc server: read body err: ", err)
+		return req, err
 	}
 	return req, nil
 }
@@ -166,7 +179,11 @@ func (server *Server) sendResponse(cc codec.Codec, h *codec.Header, body interfa
 
 func (server *Server) handleRequest(cc codec.Codec, req *request, sending *sync.Mutex, wg *sync.WaitGroup) {
 	defer wg.Done()
-	log.Println(req.h, req.argv.Elem())
-	req.replyv = reflect.ValueOf(fmt.Sprintf("go-rpc resp %d", req.h.Seq))
+	err := req.svc.call(req.mtype, req.argv, req.replyv)
+	if err != nil {
+		req.h.Error = err.Error()
+		server.sendResponse(cc, req.h, invalidRequest, sending)
+		return
+	}
 	server.sendResponse(cc, req.h, req.replyv.Interface(), sending)
 }

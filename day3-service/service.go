@@ -50,8 +50,8 @@ func isExportedOrBuiltinType(t reflect.Type) bool {
 	return ast.IsExported(t.Name()) || t.PkgPath() == ""
 }
 
-// Call 反射调用方法
-func (s *service) Call(m *methodType, argv, replyv reflect.Value) error {
+// 反射调用方法
+func (s *service) call(m *methodType, argv, replyv reflect.Value) error {
 	atomic.AddUint64(&m.numCalls, 1)
 	f := m.method.Func
 	returnValues := f.Call([]reflect.Value{s.rcvr, argv, replyv})
