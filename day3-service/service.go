@@ -10,6 +10,7 @@ import (
 	"net"
 	"reflect"
 	"sync"
+	"sync/atomic"
 )
 
 const MagicNumber = 0x3bef5c
@@ -17,6 +18,38 @@ const MagicNumber = 0x3bef5c
 type Option struct {
 	MagicNumber int
 	CodecType   codec.Type
+}
+
+type methodType struct {
+	method    reflect.Method // 方法本身
+	ArgType   reflect.Type   // 第一个参数类型
+	ReplyType reflect.Type   // 第二个参数类型
+	numCalls  uint64         // 统计调用次数
+}
+
+func (m *methodType) NumCalls() uint64 {
+	return atomic.LoadUint64(&m.numCalls)
+}
+
+func (m *methodType) newArgv() reflect.Value {
+	var argv reflect.Value
+	if m.ArgType.Kind() == reflect.Ptr {
+		argv = reflect.New(m.ArgType.Elem())
+	} else {
+		argv = reflect.New(m.ArgType).Elem()
+	}
+	return argv
+}
+
+func (m *methodType) newReplyv() reflect.Value {
+	replyv := reflect.New(m.ReplyType.Elem())
+	switch m.ReplyType.Elem().Kind() {
+	case reflect.Map:
+		replyv.Elem().Set(reflect.MakeMap(m.ReplyType.Elem()))
+	case reflect.Slice:
+		replyv.Elem().Set(reflect.MakeSlice(m.ReplyType.Elem(), 0, 0))
+	}
+	return replyv
 }
 
 var DefaultOption = &Option{
