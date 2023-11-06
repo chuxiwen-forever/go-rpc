@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"gorpc"
 	"log"
 	"net"
@@ -51,7 +52,7 @@ func main() {
 				Num2: i * i,
 			}
 			var reply int
-			if err := client.Call("Foo.Sum", args, &reply); err != nil {
+			if err := client.Call(context.Background(), "Foo.Sum", args, &reply); err != nil {
 				log.Fatal("call Foo.Sum error:", err)
 			}
 			log.Printf("%d + %d = %d", args.Num1, args.Num2, reply)
