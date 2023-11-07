@@ -124,7 +124,7 @@ func (client *Client) receive() {
 	var err error
 	for err == nil {
 		var h codec.Header
-		if err := client.cc.ReadHeader(&h); err != nil {
+		if err = client.cc.ReadHeader(&h); err != nil {
 			break
 		}
 		call := client.removeCall(h.Seq)
@@ -224,7 +224,7 @@ type clientResult struct {
 
 type newClientFunc func(conn net.Conn, opt *Option) (client *Client, err error)
 
-func dialTimeOut(f newClientFunc, network, address string, opts ...*Option) (client *Client, err error) {
+func dialTimeout(f newClientFunc, network, address string, opts ...*Option) (client *Client, err error) {
 	opt, err := parseOptions(opts...)
 	if err != nil {
 		return nil, err
@@ -259,7 +259,7 @@ func dialTimeOut(f newClientFunc, network, address string, opts ...*Option) (cli
 }
 
 func Dial(network, address string, opts ...*Option) (*Client, error) {
-	return dialTimeOut(NewClient, network, address, opts...)
+	return dialTimeout(NewClient, network, address, opts...)
 }
 
 func NewHTTPClient(conn net.Conn, opt *Option) (*Client, error) {
@@ -276,7 +276,7 @@ func NewHTTPClient(conn net.Conn, opt *Option) (*Client, error) {
 }
 
 func DialHTTP(network, address string, opts ...*Option) (*Client, error) {
-	return dialTimeOut(NewHTTPClient, network, address, opts...)
+	return dialTimeout(NewHTTPClient, network, address, opts...)
 }
 
 func XDial(rpcAddr string, opts ...*Option) (*Client, error) {

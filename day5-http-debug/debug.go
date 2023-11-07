@@ -2,13 +2,13 @@ package gorpc
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
-	"text/template"
 )
 
 const debugText = `<html>
 	<body>
-	<title>GeeRPC Services</title>
+	<title>gorpc Services</title>
 	{{range .}}
 	<hr>
 	Service {{.Name}}
@@ -39,7 +39,7 @@ type debugService struct {
 
 func (server debugHTTP) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var services []debugService
-	server.serviceMap.Range(func(namei, svci any) bool {
+	server.serviceMap.Range(func(namei, svci interface{}) bool {
 		svc := svci.(*service)
 		services = append(services, debugService{Name: namei.(string), Method: svc.method})
 		return true

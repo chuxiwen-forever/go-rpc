@@ -57,7 +57,7 @@ func (server *Server) ServeConn(conn io.ReadWriteCloser) {
 
 	f := codec.NewCodecFuncMap[opt.CodecType]
 	if f == nil {
-		log.Printf("rpc server: invalid codec type %server", opt.CodecType)
+		log.Printf("rpc server: invalid codec type %s", opt.CodecType)
 		return
 	}
 	server.serveCodec(f(conn), &opt)
@@ -95,7 +95,7 @@ type request struct {
 func (server *Server) readRequestHeader(cc codec.Codec) (*codec.Header, error) {
 	var h codec.Header
 	if err := cc.ReadHeader(&h); err != nil {
-		if err != io.EOF && !errors.Is(err, io.ErrUnexpectedEOF) {
+		if err != io.EOF && err != io.ErrUnexpectedEOF {
 			log.Println("rpc server: read header error:", err)
 		}
 		return nil, err
