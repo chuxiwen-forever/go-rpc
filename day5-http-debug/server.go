@@ -95,7 +95,7 @@ type request struct {
 func (server *Server) readRequestHeader(cc codec.Codec) (*codec.Header, error) {
 	var h codec.Header
 	if err := cc.ReadHeader(&h); err != nil {
-		if err != io.EOF && err != io.ErrUnexpectedEOF {
+		if err != io.EOF && !errors.Is(err, io.ErrUnexpectedEOF) {
 			log.Println("rpc server: read header error:", err)
 		}
 		return nil, err
@@ -214,25 +214,25 @@ func Register(rcvr interface{}) error {
 }
 
 const (
-	connected        = "200 Connected to Gee RPC"
-	defaultRPCPath   = "/_geeprc_"
+	connected        = "200 Connected to Go RPC"
+	defaultRPCPath   = "/_goprc_"
 	defaultDebugPath = "/debug/gorpc"
+	whitespace       = " "
 )
 
 func (server *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if req.Method != "CONNECT" {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Type", "text/plain;charset=utf-8")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		_, _ = io.WriteString(w, "405 must CONNECT\n")
 		return
 	}
-
 	conn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
 		log.Print("rpc hijacking ", req.RemoteAddr, ": ", err.Error())
 		return
 	}
-	_, _ = io.WriteString(conn, "HTTP/1.0"+connected+"\n\n")
+	_, _ = io.WriteString(conn, "HTTP/1.0"+whitespace+connected+"\n\n")
 	server.ServeConn(conn)
 }
 

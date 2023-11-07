@@ -100,14 +100,15 @@ func (client *Client) terminateCalls(err error) {
 func (client *Client) send(call *Call) {
 	client.sending.Lock()
 	defer client.sending.Unlock()
+
 	seq, err := client.registerCall(call)
 	if err != nil {
 		call.Error = err
 		call.done()
 		return
 	}
-	client.header.Seq = seq
 	client.header.ServiceMethod = call.ServiceMethod
+	client.header.Seq = seq
 	client.header.Error = ""
 
 	if err := client.cc.Write(&client.header, call.Args); err != nil {

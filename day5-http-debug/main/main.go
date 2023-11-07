@@ -33,9 +33,9 @@ func startServer(addr chan string) {
 func call(addr chan string) {
 	client, _ := gorpc.DialHTTP("tcp", <-addr)
 	defer func() { _ = client.Close() }()
+
 	time.Sleep(time.Second)
 	var wg sync.WaitGroup
-
 	for i := 0; i < 5; i++ {
 		wg.Add(1)
 		go func(i int) {
