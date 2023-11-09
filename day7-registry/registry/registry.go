@@ -1,7 +1,10 @@
 package registry
 
 import (
+	"log"
+	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -55,4 +58,29 @@ func (r *GoRegistry) aliveServers() []string {
 	}
 	sort.Strings(alive)
 	return alive
+}
+
+func (r *GoRegistry) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case "GET":
+		w.Header().Set("X-Gorpc-Servers", strings.Join(r.aliveServers(), ","))
+	case "POST":
+		addr := req.Header.Get("X-Gorpc-server")
+		if addr == "" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		r.putServer(addr)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func (r *GoRegistry) HandleHTTP(registryPath string) {
+	http.Handle(registryPath, r)
+	log.Println("rpc registry path:", registryPath)
+}
+
+func HandleHTTP() {
+	DefaultGoRegister.HandleHTTP(defaultPath)
 }
