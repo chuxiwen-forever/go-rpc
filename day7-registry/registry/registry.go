@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"sort"
 	"sync"
 	"time"
 )
@@ -29,3 +30,29 @@ func New(timeout time.Duration) *GoRegistry {
 }
 
 var DefaultGoRegister = New(defaultTimeout)
+
+func (r *GoRegistry) putServer(addr string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	s := r.servers[addr]
+	if s == nil {
+		r.servers[addr] = &ServerItem{Addr: addr, start: time.Now()}
+	} else {
+		s.start = time.Now()
+	}
+}
+
+func (r *GoRegistry) aliveServers() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var alive []string
+	for addr, s := range r.servers {
+		if r.timeout == 0 || s.start.Add(r.timeout).After(time.Now()) {
+			alive = append(alive, addr)
+		} else {
+			delete(r.servers, addr)
+		}
+	}
+	sort.Strings(alive)
+	return alive
+}
